@@ -276,9 +276,24 @@ class Resque_Worker
         try {
             Resque_Event::trigger('afterFork', $job);
             $job->perform();
-            $this->log(array('message' => 'done ID:' . $job->payload['id'], 'data' => array('type' => 'done', 'job_id' => $job->payload['id'], 'time' => round(microtime(true) - $startTime, 3) * 1000)), self::LOG_TYPE_INFO);
+            $this->log([
+                'message' => 'done ID:' . $job->payload['id'],
+                'data' => [
+                    'type' => 'done',
+                    'job_id' => $job->payload['id'],
+                    'output' => $job->getOutput(),
+                    'time' => round(microtime(true) - $startTime, 3) * 1000]
+            ], self::LOG_TYPE_INFO);
         } catch (Exception $e) {
-            $this->log(array('message' => $job . ' failed: ' . $e->getMessage(), 'data' => array('type' => 'fail', 'log' => $e->getMessage(), 'job_id' => $job->payload['id'], 'time' => round(microtime(true) - $startTime, 3) * 1000)), self::LOG_TYPE_ERROR);
+            $this->log([
+                'message' => $job . ' failed: ' . $e->getMessage(),
+                'data' => [
+                    'type' => 'fail',
+                    'log' => $e->getMessage(),
+                    'output' => $job->getOutput(),
+                    'job_id' => $job->payload['id'],
+                    'time' => round(microtime(true) - $startTime, 3) * 1000]
+            ], self::LOG_TYPE_ERROR);
             $job->fail($e);
             return;
         }
@@ -337,6 +352,7 @@ class Resque_Worker
      * Return values are those of pcntl_fork().
      *
      * @return int -1 if the fork failed, 0 for the forked child, the PID of the child for the parent.
+     * @throws RuntimeException
      */
     protected function fork()
     {

@@ -53,6 +53,7 @@ class Resque_Job
 	 * @param boolean $monitor Set to true to be able to monitor the status of a job.
 	 *
 	 * @return string
+     * @throws InvalidArgumentException
 	 */
 	public static function create($queue, $class, $args = null, $monitor = false)
 	{
@@ -149,6 +150,7 @@ class Resque_Job
 	 * Get the instantiated object for this job that will be performing work.
 	 *
 	 * @return object Instance of the object that this job belongs to.
+     * @throws Resque_Exception
 	 */
 	public function getInstance()
 	{
@@ -265,5 +267,13 @@ class Resque_Job
 					'args' => !empty($this->payload['args']) ? $this->payload['args'] : ''
 				));
 	}
+
+    /**
+     * @return string
+     */
+    public function getOutput()
+    {
+        return ob_get_contents();
+    }
 }
 
