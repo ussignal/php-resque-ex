@@ -32,6 +32,16 @@ class Resque_Job
 	 */
 	private $instance;
 
+    /**
+     * @var string A place to hold our output buffer until the job is finished
+     */
+    private $output;
+
+    /**
+     * @var
+     */
+    private $event;
+
 	/**
 	 * Instantiate a new instance of a job.
 	 *
@@ -190,6 +200,33 @@ class Resque_Job
 	 */
 	public function perform()
 	{
+        //get the process_event from mongo so we can update it as the job flushes the output buffer
+        $mongoClient = new MongoClient();
+        $db = $mongoClient->selectDB('cube_development');
+        $collection = new MongoCollection($db, 'process_events');
+        $eventQuery = ['d.job_id' => $this->payload['id']];
+        $cursor = $collection->find($eventQuery);
+        $this->event = $cursor->getNext();
+
+        //as the job flushes the output buffer (aka, echo, print, etc)
+        ob_start(function($ob) {
+            $this->output .= $ob;
+            //pass in the original event and only work if it exists
+            if (!empty($this->event['_id'])) {
+                $this->worker->log([
+                    'data' => [
+                        'type' => 'process',
+                        'output' => $this->output,
+                        'id' => $this->event['_id']->__toString(),
+                        'job_id' => $this->event['d']['job_id'],
+                        'worker' => $this->event['d']['worker']
+                    ]
+                ]);
+            }
+            //returning null disables the CLI output
+            return null;
+        }, 1);
+
 		$instance = $this->getInstance();
 		try {
 			Resque_Event::trigger('beforePerform', $this);
@@ -273,7 +310,8 @@ class Resque_Job
      */
     public function getOutput()
     {
-        return ob_get_contents();
+        ob_end_flush();
+        return $this->output;
     }
 }
 
