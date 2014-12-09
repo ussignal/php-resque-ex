@@ -201,17 +201,16 @@ class Resque_Job
 	public function perform()
 	{
         //get the process_event from mongo so we can update it as the job flushes the output buffer
-        $mongoClient = new MongoClient();
-        $db = $mongoClient->selectDB('cube_development');
-        $collection = new MongoCollection($db, 'process_events');
-        $eventQuery = ['d.job_id' => $this->payload['id']];
-        $cursor = $collection->find($eventQuery);
-        $this->event = $cursor->getNext();
+
+        $this->getProcessEvent();
 
         //as the job flushes the output buffer (aka, echo, print, etc)
         ob_start(function($ob) {
             $this->output .= $ob;
             //pass in the original event and only work if it exists
+            if (empty($this->event['_id'])) {
+                $this->getProcessEvent();
+            }
             if (!empty($this->event['_id'])) {
                 $this->worker->log([
                     'data' => [
@@ -250,6 +249,19 @@ class Resque_Job
 
 		return true;
 	}
+
+    /**
+     *
+     */
+    private function getProcessEvent()
+    {
+        $mongoClient = new MongoClient();
+        $db = $mongoClient->selectDB(getenv('MONGO_DB'));
+        $collection = new MongoCollection($db, 'process_events');
+        $eventQuery = ['d.job_id' => $this->payload['id']];
+        $cursor = $collection->find($eventQuery);
+        $this->event = $cursor->getNext();
+    }
 
 	/**
 	 * Mark the current job as having failed.
